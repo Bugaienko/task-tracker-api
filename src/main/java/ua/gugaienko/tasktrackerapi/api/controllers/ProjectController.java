@@ -45,7 +45,7 @@ public class ProjectController {
 
         Stream<ProjectEntity> projectStream = optionalPrefixName
                 .map(projectRepository::streamAllByNameStartingWithIgnoreCase)
-                .orElseGet(projectRepository::streamAll);
+                .orElseGet(projectRepository::streamAllBy);
 
 
 //        if (optionalPrefixName.isPresent()){
