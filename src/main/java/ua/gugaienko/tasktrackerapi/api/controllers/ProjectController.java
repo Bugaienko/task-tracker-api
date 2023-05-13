@@ -3,10 +3,10 @@ package ua.gugaienko.tasktrackerapi.api.controllers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import ua.gugaienko.tasktrackerapi.api.controllers.helpers.ControllerHelper;
 import ua.gugaienko.tasktrackerapi.api.dto.AskDTO;
 import ua.gugaienko.tasktrackerapi.api.dto.ProjectDTO;
 import ua.gugaienko.tasktrackerapi.api.exceptions.BadRequestException;
-import ua.gugaienko.tasktrackerapi.api.exceptions.NotFoundException;
 import ua.gugaienko.tasktrackerapi.api.factories.ProjectDtoFactory;
 import ua.gugaienko.tasktrackerapi.store.models.ProjectEntity;
 import ua.gugaienko.tasktrackerapi.store.repositories.ProjectRepository;
@@ -28,7 +28,11 @@ import java.util.stream.Stream;
 public class ProjectController {
 
     private final ProjectRepository projectRepository;
+
     private final ProjectDtoFactory projectDtoFactory;
+
+    private final ControllerHelper controllerHelper;
+
     public static final String FETCH_PROJECT = "/api/projects";
     public static final String CREATE_PROJECT = "/api/projects";
     public static final String EDIT_PROJECT = "/api/projects/{project_id}";
@@ -36,7 +40,7 @@ public class ProjectController {
 
     public static final String CREATE_OR_UPDATE_PROJECT = "/api/projects";
 
-    @Transactional
+
     @GetMapping(FETCH_PROJECT)
     public List<ProjectDTO> fetchProjects(
             @RequestParam(value = "prefix_name", required = false) Optional<String> optionalPrefixName) {
@@ -63,11 +67,11 @@ public class ProjectController {
     @PutMapping(CREATE_OR_UPDATE_PROJECT)
     public ProjectDTO createOrUpdateProject(
             @RequestParam(value = "project_id", required = false) Optional<Long> optionalProjectId,
-            @RequestParam(value = "projectName", required = false) Optional<String> optionalProjectName
+            @RequestParam(value = "project_name", required = false) Optional<String> optionalProjectName
             // Another params
     ) {
 
-        optionalProjectName = optionalProjectName.filter(projectName -> projectName.trim().isEmpty());
+        optionalProjectName = optionalProjectName.filter(projectName -> !projectName.trim().isEmpty());
 
         boolean isCreate = optionalProjectId.isEmpty();
 
@@ -76,7 +80,7 @@ public class ProjectController {
         }
 
         final ProjectEntity project = optionalProjectId
-                .map(this::getProjectOrThrowException)
+                .map(controllerHelper::getProjectOrThrowException)
                 .orElseGet(() -> ProjectEntity.builder().build());
 
 
@@ -101,21 +105,21 @@ public class ProjectController {
 
     @Transactional
     @PostMapping(CREATE_PROJECT)
-    public ProjectDTO createProject(@RequestParam String projectName) {
+    public ProjectDTO createProject(@RequestParam String project_name) {
 
-        if (projectName.trim().isEmpty()) {
+        if (project_name.trim().isEmpty()) {
             throw new BadRequestException("Name can't be empty.");
         }
 
         projectRepository
-                .findByName(projectName)
+                .findByName(project_name)
                 .ifPresent(project -> {
-                    throw new BadRequestException(String.format("Project \"%s\" already exist.", projectName));
+                    throw new BadRequestException(String.format("Project \"%s\" already exist.", project_name));
                 });
 
         ProjectEntity project = projectRepository.saveAndFlush(
                 ProjectEntity.builder()
-                        .name(projectName)
+                        .name(project_name)
                         .build()
         );
 
@@ -132,7 +136,7 @@ public class ProjectController {
             throw new BadRequestException("Name can't be empty.");
         }
 
-        ProjectEntity project = getProjectOrThrowException(projectId);
+        ProjectEntity project = controllerHelper.getProjectOrThrowException(projectId);
 
         projectRepository
                 .findByName(projectName)
@@ -150,23 +154,13 @@ public class ProjectController {
         return projectDtoFactory.makeProjectDto(project);
     }
 
-    private ProjectEntity getProjectOrThrowException(Long projectId) {
-        return projectRepository
-                .findById(projectId)
-                .orElseThrow(() -> new NotFoundException(
-                                String.format(
-                                        "Project with \"%s\" doesn't exist",
-                                        projectId
-                                )
-                        )
-                );
-    }
+
 
     @Transactional
     @DeleteMapping(DELETE_PROJECT)
     public AskDTO deleteProject(@PathVariable("project_id") Long projectId) {
 
-        getProjectOrThrowException(projectId);
+        controllerHelper.getProjectOrThrowException(projectId);
 
         projectRepository.deleteById(projectId);
 
